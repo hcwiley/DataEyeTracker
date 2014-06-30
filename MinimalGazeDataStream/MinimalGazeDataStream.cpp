@@ -10,6 +10,15 @@
 #include <assert.h>
 #include "eyex\EyeX.h"
 
+#include "opencv2\core\core.hpp"
+#include "opencv2\highgui\highgui.hpp"
+#include "opencv2\imgproc\imgproc.hpp"
+#include "opencv2\photo\photo.hpp"
+
+#include <iostream>
+
+using namespace std;
+
 #pragma comment (lib, "Tobii.EyeX.Client.lib")
 
 // ID of the global interactor that provides our data stream; must be unique within the application.
@@ -151,6 +160,21 @@ int main(int argc, char* argv[])
 	success &= txRegisterEventHandler(hContext, &hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
 	success &= txEnableConnection(hContext) == TX_RESULT_OK;
 
+	cv::Mat image = cv::imread("..\\images\\data1.jpg", 1);
+	
+	if( !image.data )
+	{
+		cout <<  "Could not open or find the image" << std::endl ;
+		return -1;
+	}
+
+	cv::namedWindow( "window", CV_WINDOW_AUTOSIZE | CV_GUI_NORMAL);
+	
+	cv::resize(image, image, cvSize(1980,1150), 0, 0, 1);
+
+	cv::imshow( "window", image );
+	cv::moveWindow( "window", -25, -20 );
+	
 	// let the events flow until a key is pressed.
 	if (success) {
 		printf("Initialization was successful.\n");
@@ -158,7 +182,8 @@ int main(int argc, char* argv[])
 		printf("Initialization failed.\n");
 	}
 	printf("Press any key to exit...\n");
-	_getch();
+	cv::waitKey(0);
+	//_getch();
 	printf("Exiting.\n");
 
 	// disable and delete the context.
@@ -166,6 +191,8 @@ int main(int argc, char* argv[])
 	txReleaseObject(&g_hGlobalInteractorSnapshot);
 	txShutdownContext(hContext, TX_CLEANUPTIMEOUT_DEFAULT, TX_FALSE);
 	txReleaseContext(&hContext);
+
+	cv::destroyWindow("window");
 
 	return 0;
 }
