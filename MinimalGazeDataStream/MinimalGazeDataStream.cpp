@@ -26,6 +26,7 @@ static const TX_STRING InteractorId = "Twilight Sparkle";
 
 // global variables
 static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
+cv::Mat image;
 
 /*
  * Initializes g_hGlobalInteractorSnapshot with an interactor that has the Gaze Point behavior.
@@ -112,6 +113,10 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
 		printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
+		if(!image.data)
+			return;
+		cv::circle(image, cvPoint((int)eventParams.X, (int)eventParams.Y), 5, cvScalar(0,0,255), 5, 0, 0);
+		cv::imshow("window", image);
 	} else {
 		printf("Failed to interpret gaze data event packet.\n");
 	}
@@ -160,7 +165,7 @@ int main(int argc, char* argv[])
 	success &= txRegisterEventHandler(hContext, &hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
 	success &= txEnableConnection(hContext) == TX_RESULT_OK;
 
-	cv::Mat image = cv::imread("..\\images\\data1.jpg", 1);
+	image = cv::imread("..\\images\\data1.jpg", 1);
 	
 	if( !image.data )
 	{
