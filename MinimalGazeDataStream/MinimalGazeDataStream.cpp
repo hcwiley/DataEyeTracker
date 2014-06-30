@@ -152,6 +152,21 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
  */
 int main(int argc, char* argv[])
 {
+	cv::namedWindow( "window", CV_WINDOW_AUTOSIZE | CV_GUI_NORMAL);
+
+	image = cv::imread("..\\images\\data1.jpg", 1);
+	
+	if( !image.data )
+	{
+		cout <<  "Could not open or find the image" << std::endl ;
+		return -1;
+	}
+	
+	cv::resize(image, image, cvSize(1980,1150), 0, 0, 1);
+
+	cv::imshow( "window", image );
+	cv::moveWindow( "window", -25, -20 );
+
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
 	TX_TICKET hEventHandlerTicket = TX_INVALID_TICKET;
@@ -165,21 +180,6 @@ int main(int argc, char* argv[])
 	success &= txRegisterEventHandler(hContext, &hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
 	success &= txEnableConnection(hContext) == TX_RESULT_OK;
 
-	image = cv::imread("..\\images\\data1.jpg", 1);
-	
-	if( !image.data )
-	{
-		cout <<  "Could not open or find the image" << std::endl ;
-		return -1;
-	}
-
-	cv::namedWindow( "window", CV_WINDOW_AUTOSIZE | CV_GUI_NORMAL);
-	
-	cv::resize(image, image, cvSize(1980,1150), 0, 0, 1);
-
-	cv::imshow( "window", image );
-	cv::moveWindow( "window", -25, -20 );
-	
 	// let the events flow until a key is pressed.
 	if (success) {
 		printf("Initialization was successful.\n");
