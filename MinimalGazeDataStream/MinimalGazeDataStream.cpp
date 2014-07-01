@@ -26,7 +26,13 @@ static const TX_STRING InteractorId = "Twilight Sparkle";
 
 // global variables
 static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
-cv::Mat image;
+cv::Mat image0;
+cv::Mat imageMask;
+
+// blacks out the imageMask Mat
+void blackOutMask(){
+	imageMask.setTo(cv::Scalar(0,0,0));
+}
 
 /*
  * Initializes g_hGlobalInteractorSnapshot with an interactor that has the Gaze Point behavior.
@@ -113,10 +119,13 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
 		printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
-		if(!image.data)
+		if(!image0.data)
 			return;
-		cv::circle(image, cvPoint((int)eventParams.X, (int)eventParams.Y), 5, cvScalar(0,0,255), 5, 0, 0);
-		cv::imshow("window", image);
+		blackOutMask();
+		cv::Mat img;
+		cv::circle(imageMask, cvPoint((int)eventParams.X, (int)eventParams.Y), 70, cvScalar(255,255,255), -1, 8, 0);
+		image0.copyTo(img, imageMask);
+		cv::imshow("window", img);
 	} else {
 		printf("Failed to interpret gaze data event packet.\n");
 	}
@@ -147,6 +156,7 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 	txReleaseObject(&hEvent);
 }
 
+
 /*
  * Application entry point.
  */
@@ -154,17 +164,20 @@ int main(int argc, char* argv[])
 {
 	cv::namedWindow( "window", CV_WINDOW_AUTOSIZE | CV_GUI_NORMAL);
 
-	image = cv::imread("..\\images\\data1.jpg", 1);
+	image0 = cv::imread("..\\images\\data1.jpg", 1);
 	
-	if( !image.data )
+	if( !image0.data )
 	{
 		cout <<  "Could not open or find the image" << std::endl ;
 		return -1;
 	}
 	
-	cv::resize(image, image, cvSize(1980,1150), 0, 0, 1);
+	cv::resize(image0, image0, cvSize(1980,1150), 0, 0, 1);
+	imageMask = image0.clone();
 
-	cv::imshow( "window", image );
+	blackOutMask();
+
+	cv::imshow( "window", imageMask );
 	cv::moveWindow( "window", -25, -20 );
 
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
