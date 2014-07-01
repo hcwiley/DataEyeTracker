@@ -111,6 +111,8 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	}
 }
 
+int shouldUpdateWindow = 0;
+cv::Point lastPoint;
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -121,11 +123,17 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
-		blackOutMask();
-		cv::Mat img;
-		cv::circle(imageMask, cvPoint((int)eventParams.X, (int)eventParams.Y), 70, cvScalar(255,255,255), -1, 8, 0);
-		image0.copyTo(img, imageMask);
-		cv::imshow("window", img);
+		if(shouldUpdateWindow++ > 3) {
+			shouldUpdateWindow = 0;
+			blackOutMask();
+			cv::Mat img;
+			int x = ( lastPoint.x + eventParams.X ) / 2;
+			int y = ( lastPoint.y + eventParams.Y ) / 2;
+			cv::circle(imageMask, cvPoint(x,y), 70, cvScalar(255,255,255), -1, 8, 0);
+			lastPoint = cvPoint((int)eventParams.X, (int)eventParams.Y);
+			image0.copyTo(img, imageMask);
+			cv::imshow("window", img);
+		}
 	} else {
 		printf("Failed to interpret gaze data event packet.\n");
 	}
