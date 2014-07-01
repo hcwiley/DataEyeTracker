@@ -113,6 +113,7 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
+cv::Point weightedAvgPoint;
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -123,13 +124,18 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
-		if(shouldUpdateWindow++ > 3) {
+		if(shouldUpdateWindow++ > 1) {
 			shouldUpdateWindow = 0;
 			blackOutMask();
 			cv::Mat img;
-			int x = ( lastPoint.x + eventParams.X ) / 2;
-			int y = ( lastPoint.y + eventParams.Y ) / 2;
-			cv::circle(imageMask, cvPoint(x,y), 70, cvScalar(255,255,255), -1, 8, 0);
+			//int x = ( lastPoint.x + eventParams.X ) / 2;
+			//int y = ( lastPoint.y + eventParams.Y ) / 2;
+			weightedAvgPoint.x *= 0.8;
+			weightedAvgPoint.y *= 0.8;
+			weightedAvgPoint.x += eventParams.X * 0.2;
+			weightedAvgPoint.y += eventParams.Y * 0.2;
+			//cv::circle(imageMask, cvPoint(x,y), 70, cvScalar(255,255,255), -1, 8, 0);
+			cv::circle(imageMask, weightedAvgPoint, 70, cvScalar(255,255,255), -1, 8, 0);
 			lastPoint = cvPoint((int)eventParams.X, (int)eventParams.Y);
 			image0.copyTo(img, imageMask);
 			cv::imshow("window", img);
@@ -170,7 +176,7 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
  */
 int main(int argc, char* argv[])
 {
-	cv::namedWindow( "window", CV_WINDOW_AUTOSIZE | CV_GUI_NORMAL);
+	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
 	image0 = cv::imread("..\\images\\data1.jpg", 1);
 	
@@ -180,13 +186,14 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	cv::resize(image0, image0, cvSize(1980,1150), 0, 0, 1);
+	cv::resize(image0, image0, cvSize(1920,1080), 0, 0, 1);
+
 	imageMask = image0.clone();
 
 	blackOutMask();
 
 	cv::imshow( "window", imageMask );
-	cv::moveWindow( "window", -25, -20 );
+	cv::moveWindow( "window", -25, -30 );
 
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
