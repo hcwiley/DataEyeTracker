@@ -29,12 +29,13 @@ static const TX_STRING InteractorId = "Twilight Sparkle";
 static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
 cv::Mat image0;
 cv::Mat imageMask;
+cv::Mat imageProjector;
 const int numImages = 2;
 int curImage = 0;
 
-int CHANGE_IMAGE_TIMER = 3;
-int BOUNDING_BOX = 50;
-int CIRCLE_SIZE = 125;
+int CHANGE_IMAGE_TIMER = 4;
+int BOUNDING_BOX = 40;
+int CIRCLE_SIZE = 100;
 
 // blacks out the imageMask Mat
 void blackOutMask(){
@@ -42,9 +43,8 @@ void blackOutMask(){
 }
 
 void changeImage(){
-	int pathLen = 200;
-	char path[200];// = (char*)malloc(sizeof(char)*pathLen);
-	curImage += 1;
+	char path[200];
+	curImage++;
 	if( curImage > numImages )
 		curImage = 1;
 	sprintf_s(path, 200 ,"..\\images\\data%d.jpg", curImage);
@@ -59,8 +59,10 @@ void changeImage(){
 	cv::resize(image0, image0, cvSize(1920,1080), 0, 0, 1);
 
 	imageMask = image0.clone();
+	imageProjector = image0.clone();
 
-	//free(&path);
+	imageProjector.setTo(cv::Scalar(0,0,0));
+
 
 }
 
@@ -146,6 +148,7 @@ cv::Point lastPoint;
 cv::Point weightedAvgPoint;
 int shouldMove = 0;
 time_t lastMove = 0;
+
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -153,7 +156,9 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 {
 	TX_GAZEPOINTDATAEVENTPARAMS eventParams;
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
-		printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
+		time_t now;
+		time(&now);
+		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
 		if(shouldUpdateWindow++ > 1) {
@@ -161,7 +166,6 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			//clear the things
 			shouldUpdateWindow = 0;
 			blackOutMask();
-			cv::Mat img;
 
 			// calculate weighted average for making the dot move smoother
 			weightedAvgPoint.x *= 0.8;
@@ -171,22 +175,27 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 
 			// draw circle for where eye is
 			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
+			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
 
 			// display image
-			image0.copyTo(img, imageMask);
-			cv::imshow("window", img);
+			cv::Mat img0;
+			cv::Mat imgP;
+			image0.copyTo(img0, imageMask);
+			image0.copyTo(imgP, imageProjector);
+			
+			cv::imshow("window", img0);
+			cv::imshow("projector", imgP);
 		}
 
 		// checking for whether we should change the image
-		time_t now;
-		time(&now);
 		if( abs(lastPoint.x - eventParams.X) <= BOUNDING_BOX && abs(lastPoint.y - eventParams.Y) <= BOUNDING_BOX  ){
-			shouldMove++;
+			shouldMove ++;
 		} else {
 			shouldMove = 0;
 		}
 		if ( shouldMove > CHANGE_IMAGE_TIMER ) {
-			if( difftime(now, lastMove) > 6 ) {
+			shouldMove = 0;
+			if( difftime(now, lastMove) >  CHANGE_IMAGE_TIMER * 1.5) {
 				time(&lastMove);
 				changeImage();
 			}
@@ -229,13 +238,18 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 int main(int argc, char* argv[])
 {
 	time(&lastMove);
+	
 	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
+	cv::namedWindow( "projector", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
 	changeImage();
 	blackOutMask();
 
 	cv::imshow( "window", imageMask );
 	cv::moveWindow( "window", -25, -30 );
+
+	cv::imshow( "projector", imageMask );
+	cv::moveWindow( "projector", 200, 400 );
 
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
