@@ -51,6 +51,10 @@ void blackOutMask(){
 	imageMask.setTo(cv::Scalar(0,0,0));
 }
 
+void resetProjector(){
+	imageProjector.setTo(cv::Scalar(0,0,0));
+}
+
 void changeImage(){
 	char path[200];
 	curImage++;
@@ -70,9 +74,8 @@ void changeImage(){
 	imageMask = image0.clone();
 	imageProjector = image0.clone();
 
-	imageProjector.setTo(cv::Scalar(0,0,0));
-
-
+	resetProjector();
+	blackOutMask();
 }
 
 /*
@@ -255,6 +258,39 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 
 
 /*
+ * Handles state changed notifications.
+ */
+void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userParam)
+{
+	TX_RESULT result = TX_RESULT_UNKNOWN;
+	TX_HANDLE hStateBag = TX_EMPTY_HANDLE;
+	TX_BOOL success;
+	TX_INTEGER presenceData;
+
+	if (txGetAsyncDataResultCode(hAsyncData, &result) == TX_RESULT_OK && txGetAsyncDataContent(hAsyncData, &hStateBag) == TX_RESULT_OK)
+	{		
+		success = (txGetStateValueAsInteger(hStateBag, TX_STATEPATH_PRESENCEDATA, &presenceData) == TX_RESULT_OK);
+		if (success)
+		{
+			printf("User is %s\n", presenceData == TX_PRESENCEDATA_PRESENT ? "present" : "NOT present");
+
+			if( presenceData == TX_PRESENCEDATA_NOTPRESENT ) {
+				if(!image0.data)
+					return;
+
+				cv::Mat img0;
+				cv::blur(image0,img0,cvSize(101,101),cvPoint(-1,-1),4);
+				cv::imshow("window", img0);
+			} else {
+				blackOutMask();
+				resetProjector();
+
+			}
+		}
+	}
+}
+
+/*
  * Application entry point.
  */
 int main(int argc, char* argv[])
@@ -265,7 +301,6 @@ int main(int argc, char* argv[])
 	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
 	changeImage();
-	blackOutMask();
 
 	cv::imshow( "window", imageMask );
 	cv::moveWindow( "window", -25, -30 );
@@ -276,6 +311,7 @@ int main(int argc, char* argv[])
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
 	TX_TICKET hEventHandlerTicket = TX_INVALID_TICKET;
+	TX_TICKET hPresenceStateChangedTicket = TX_INVALID_TICKET;
 	BOOL success;
 
 	// initialize and enable the context that is our link to the EyeX Engine.
@@ -284,6 +320,7 @@ int main(int argc, char* argv[])
 	success &= InitializeGlobalInteractorSnapshot(hContext);
 	success &= txRegisterConnectionStateChangedHandler(hContext, &hConnectionStateChangedTicket, OnEngineConnectionStateChanged, NULL) == TX_RESULT_OK;
 	success &= txRegisterEventHandler(hContext, &hEventHandlerTicket, HandleEvent, NULL) == TX_RESULT_OK;
+	success &= txRegisterStateChangedHandler(hContext, &hPresenceStateChangedTicket, TX_STATEPATH_PRESENCEDATA, OnPresenceStateChanged, NULL) == TX_RESULT_OK;
 	success &= txEnableConnection(hContext) == TX_RESULT_OK;
 
 	// let the events flow until a key is pressed.
