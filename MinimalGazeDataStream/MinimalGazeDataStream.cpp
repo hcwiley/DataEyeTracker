@@ -157,17 +157,22 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		if(!image0.data)
 			return;
 		if(shouldUpdateWindow++ > 1) {
+
+			//clear the things
 			shouldUpdateWindow = 0;
 			blackOutMask();
 			cv::Mat img;
-			//int x = ( lastPoint.x + eventParams.X ) / 2;
-			//int y = ( lastPoint.y + eventParams.Y ) / 2;
+
+			// calculate weighted average for making the dot move smoother
 			weightedAvgPoint.x *= 0.8;
 			weightedAvgPoint.y *= 0.8;
 			weightedAvgPoint.x += eventParams.X * 0.2;
 			weightedAvgPoint.y += eventParams.Y * 0.2;
-			//cv::circle(imageMask, cvPoint((int)eventParams.X, (int)eventParams.Y), 70, cvScalar(255,255,255), -1, 8, 0);
+
+			// draw circle for where eye is
 			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
+
+			// display image
 			image0.copyTo(img, imageMask);
 			cv::imshow("window", img);
 		}
