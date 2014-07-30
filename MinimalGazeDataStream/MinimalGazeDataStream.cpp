@@ -33,9 +33,18 @@ cv::Mat imageProjector;
 const int numImages = 2;
 int curImage = 0;
 
-int CHANGE_IMAGE_TIMER = 4;
-int BOUNDING_BOX = 40;
+
+/**
+* ANNIELAURIE CHANGE THE CHANGE_IMAGE_TIMER TO BE NUMBER OF SECONDS TO CHANGE TO NEXT IMAGE
+*/
+int CHANGE_IMAGE_TIMER = 3;
+
+/**
+* ANNIELAURIE CHANGE THE CIRCLE_SIZE TO BE THE SIZE OF CIRCLE THAT IS VISIBLE
+*/
 int CIRCLE_SIZE = 100;
+
+int BOUNDING_BOX = 20;
 
 // blacks out the imageMask Mat
 void blackOutMask(){
@@ -149,6 +158,9 @@ cv::Point weightedAvgPoint;
 int shouldMove = 0;
 time_t lastMove = 0;
 
+int fps = 24;
+int frames = 0;
+time_t timer = 0;
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -158,6 +170,12 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 	if (txGetGazePointDataEventParams(hGazeDataBehavior, &eventParams) == TX_RESULT_OK) {
 		time_t now;
 		time(&now);
+		frames++;
+		if( difftime(now,timer) >= 1 ){
+			time(&timer);
+			fps = frames;
+			frames = 0;
+		}
 		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
@@ -167,6 +185,11 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			shouldUpdateWindow = 0;
 			blackOutMask();
 
+			// display image
+			cv::Mat img0;
+			cv::Mat imgP;
+			
+
 			// calculate weighted average for making the dot move smoother
 			weightedAvgPoint.x *= 0.8;
 			weightedAvgPoint.y *= 0.8;
@@ -174,33 +197,32 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			weightedAvgPoint.y += eventParams.Y * 0.2;
 
 			// draw circle for where eye is
-			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
+
+			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
 			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
 
-			// display image
-			cv::Mat img0;
-			cv::Mat imgP;
 			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
+
 			
 			cv::imshow("window", img0);
 			cv::imshow("projector", imgP);
 		}
 
 		// checking for whether we should change the image
-		if( abs(lastPoint.x - eventParams.X) <= BOUNDING_BOX && abs(lastPoint.y - eventParams.Y) <= BOUNDING_BOX  ){
+		if( abs(lastPoint.x - weightedAvgPoint.x) <= BOUNDING_BOX && abs(lastPoint.y - weightedAvgPoint.y) <= BOUNDING_BOX  ){
 			shouldMove ++;
 		} else {
 			shouldMove = 0;
 		}
-		if ( shouldMove > CHANGE_IMAGE_TIMER ) {
+		if ( shouldMove > CHANGE_IMAGE_TIMER * fps ) {
 			shouldMove = 0;
-			if( difftime(now, lastMove) >  CHANGE_IMAGE_TIMER * 1.5) {
+			//if( difftime(now, lastMove) >  3) {
 				time(&lastMove);
 				changeImage();
-			}
+			//}
 		}
-		lastPoint = cvPoint((int)eventParams.X, (int)eventParams.Y);
+		lastPoint = weightedAvgPoint;
 	} else {
 		printf("Failed to interpret gaze data event packet.\n");
 	}
@@ -239,8 +261,8 @@ int main(int argc, char* argv[])
 {
 	time(&lastMove);
 	
-	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 	cv::namedWindow( "projector", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
+	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
 	changeImage();
 	blackOutMask();
