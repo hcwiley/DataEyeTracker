@@ -16,6 +16,7 @@
 #include "opencv2\photo\photo.hpp"
 
 #include <iostream>
+#include <ctime>
 
 using namespace std;
 
@@ -28,10 +29,39 @@ static const TX_STRING InteractorId = "Twilight Sparkle";
 static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
 cv::Mat image0;
 cv::Mat imageMask;
+const int numImages = 2;
+int curImage = 0;
+
+int CHANGE_IMAGE_TIMER = 3;
+int BOUNDING_BOX = 50;
+int CIRCLE_SIZE = 125;
 
 // blacks out the imageMask Mat
 void blackOutMask(){
 	imageMask.setTo(cv::Scalar(0,0,0));
+}
+
+void changeImage(){
+	int pathLen = 200;
+	char path[200];// = (char*)malloc(sizeof(char)*pathLen);
+	curImage += 1;
+	if( curImage > numImages )
+		curImage = 1;
+	sprintf_s(path, 200 ,"..\\images\\data%d.jpg", curImage);
+	image0 = cv::imread(path, 1);
+	
+	if( !image0.data )
+	{
+		cout <<  "Could not open or find the image" << std::endl ;
+		return;
+	}
+	
+	cv::resize(image0, image0, cvSize(1920,1080), 0, 0, 1);
+
+	imageMask = image0.clone();
+
+	//free(&path);
+
 }
 
 /*
@@ -114,6 +144,8 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
+int shouldMove = 0;
+time_t lastMove = 0;
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -134,12 +166,27 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			weightedAvgPoint.y *= 0.8;
 			weightedAvgPoint.x += eventParams.X * 0.2;
 			weightedAvgPoint.y += eventParams.Y * 0.2;
-			//cv::circle(imageMask, cvPoint(x,y), 70, cvScalar(255,255,255), -1, 8, 0);
-			cv::circle(imageMask, weightedAvgPoint, 70, cvScalar(255,255,255), -1, 8, 0);
-			lastPoint = cvPoint((int)eventParams.X, (int)eventParams.Y);
+			//cv::circle(imageMask, cvPoint((int)eventParams.X, (int)eventParams.Y), 70, cvScalar(255,255,255), -1, 8, 0);
+			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
 			image0.copyTo(img, imageMask);
 			cv::imshow("window", img);
 		}
+
+		// checking for whether we should change the image
+		time_t now;
+		time(&now);
+		if( abs(lastPoint.x - eventParams.X) <= BOUNDING_BOX && abs(lastPoint.y - eventParams.Y) <= BOUNDING_BOX  ){
+			shouldMove++;
+		} else {
+			shouldMove = 0;
+		}
+		if ( shouldMove > CHANGE_IMAGE_TIMER ) {
+			if( difftime(now, lastMove) > 6 ) {
+				time(&lastMove);
+				changeImage();
+			}
+		}
+		lastPoint = cvPoint((int)eventParams.X, (int)eventParams.Y);
 	} else {
 		printf("Failed to interpret gaze data event packet.\n");
 	}
@@ -176,20 +223,10 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
  */
 int main(int argc, char* argv[])
 {
+	time(&lastMove);
 	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
-	image0 = cv::imread("..\\images\\data1.jpg", 1);
-	
-	if( !image0.data )
-	{
-		cout <<  "Could not open or find the image" << std::endl ;
-		return -1;
-	}
-	
-	cv::resize(image0, image0, cvSize(1920,1080), 0, 0, 1);
-
-	imageMask = image0.clone();
-
+	changeImage();
 	blackOutMask();
 
 	cv::imshow( "window", imageMask );
