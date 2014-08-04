@@ -61,7 +61,7 @@ void changeImage(){
 	curImage++;
 	if( curImage > numImages )
 		curImage = 1;
-	sprintf_s(path, 200 ,"..\\images\\data%d.jpg", curImage);
+	sprintf_s(path, 200 ,"..\\images\\data%d.png", curImage);
 	image0 = cv::imread(path, 1);
 	
 	if( !image0.data )
@@ -205,16 +205,13 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
 			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
 
-			//image0.copyTo(img0, blurCircle);
+			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
 
-			//image0.copyTo(img0, imageMask);
-
-			cv::Rect roi( weightedAvgPoint, cv::Size( CIRCLE_SIZE, CIRCLE_SIZE));
-			cv::Mat destinationROI = img0( roi );
-
-
-			image0.copyTo(img0, blurCircle);
+			//cv::Rect roi( weightedAvgPoint, cv::Size( CIRCLE_SIZE, CIRCLE_SIZE));
+			//cv::Mat destinationROI = img0( roi );
+			cv::Mat imageROI = img0(cv::Rect(weightedAvgPoint.x, weightedAvgPoint.y, CIRCLE_SIZE, CIRCLE_SIZE));
+			blurCircle.copyTo(imageROI);
 			
 
 			//cv::addWeighted(blurCircle, 0.9, img0, 1.0, 0, img0);
