@@ -49,11 +49,11 @@ int BOUNDING_BOX = 20;
 
 // blacks out the imageMask Mat
 void blackOutMask(){
-	imageMask.setTo(cv::Scalar(0,0,0));
+	imageMask.setTo(cv::Scalar(0,0,0,255));
 }
 
 void resetProjector(){
-	imageProjector.setTo(cv::Scalar(0,0,0));
+	imageProjector.setTo(cv::Scalar(0,0,0,255));
 }
 
 void changeImage(){
@@ -156,6 +156,55 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	}
 }
 
+void overlayImage(const cv::Mat &background, const cv::Mat &foreground, 
+  cv::Mat &output, cv::Point2i location)
+{
+  background.copyTo(output);
+
+
+  // start at the row indicated by location, or at row 0 if location.y is negative.
+  for(int y = std::max(location.y , 0); y < background.rows; ++y)
+  {
+    int fY = y - location.y; // because of the translation
+
+    // we are done of we have processed all rows of the foreground image.
+    if(fY >= foreground.rows)
+      break;
+
+    // start at the column indicated by location, 
+
+    // or at column 0 if location.x is negative.
+    for(int x = std::max(location.x, 0); x < background.cols; ++x)
+    {
+      int fX = x - location.x; // because of the translation.
+
+      // we are done with this row if the column is outside of the foreground image.
+      if(fX >= foreground.cols)
+        break;
+
+      // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
+      double opacity =
+        ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])
+
+        / 255.;
+
+
+      // and now combine the background and foreground pixel, using the opacity, 
+
+      // but only if opacity > 0.
+      for(int c = 0; opacity > 0 && c < output.channels(); ++c)
+      {
+        unsigned char foregroundPx =
+          foreground.data[fY * foreground.step + fX * foreground.channels() + c];
+        unsigned char backgroundPx =
+          background.data[y * background.step + x * background.channels() + c];
+        output.data[y*output.step + output.channels()*x + c] =
+          backgroundPx * (1.-opacity) + foregroundPx * opacity;
+      }
+    }
+  }
+}
+
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
@@ -190,7 +239,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			blackOutMask();
 
 			// display image
-			cv::Mat img0;// = image0.clone();
+			cv::Mat img0;
 			cv::Mat imgP;
 			
 
@@ -208,16 +257,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
 
-			//cv::Rect roi( weightedAvgPoint, cv::Size( CIRCLE_SIZE, CIRCLE_SIZE));
-			//cv::Mat destinationROI = img0( roi );
-			cv::Mat imageROI = img0(cv::Rect(weightedAvgPoint.x, weightedAvgPoint.y, CIRCLE_SIZE, CIRCLE_SIZE));
-			blurCircle.copyTo(imageROI);
-			
-
-			//cv::addWeighted(blurCircle, 0.9, img0, 1.0, 0, img0);
-			//cv::add(img0, blurCircle,img0,destinationROI,1);
-
-			
+			overlayImage(img0, blurCircle, img0, cvPoint(weightedAvgPoint.x-CIRCLE_SIZE/2,weightedAvgPoint.y-CIRCLE_SIZE/2));
 			cv::imshow("window", img0);
 			cv::imshow("projector", imgP);
 		}
@@ -240,6 +280,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		printf("Failed to interpret gaze data event packet.\n");
 	}
 }
+
 
 /*
  * Callback function invoked when an event has been received from the EyeX Engine.
