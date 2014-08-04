@@ -30,6 +30,7 @@ static TX_HANDLE g_hGlobalInteractorSnapshot = TX_EMPTY_HANDLE;
 cv::Mat image0;
 cv::Mat imageMask;
 cv::Mat imageProjector;
+cv::Mat blurCircle;
 const int numImages = 2;
 int curImage = 0;
 
@@ -189,7 +190,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			blackOutMask();
 
 			// display image
-			cv::Mat img0;
+			cv::Mat img0;// = image0.clone();
 			cv::Mat imgP;
 			
 
@@ -204,8 +205,20 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
 			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
 
-			image0.copyTo(img0, imageMask);
+			//image0.copyTo(img0, blurCircle);
 			image0.copyTo(imgP, imageProjector);
+
+			//image0.copyTo(img0, imageMask);
+
+			cv::Rect roi( weightedAvgPoint, cv::Size( CIRCLE_SIZE, CIRCLE_SIZE));
+			cv::Mat destinationROI = img0( roi );
+
+
+			image0.copyTo(img0, blurCircle);
+			
+
+			//cv::addWeighted(blurCircle, 0.9, img0, 1.0, 0, img0);
+			//cv::add(img0, blurCircle,img0,destinationROI,1);
 
 			
 			cv::imshow("window", img0);
@@ -301,6 +314,17 @@ int main(int argc, char* argv[])
 	cv::namedWindow( "window", CV_WINDOW_FULLSCREEN | CV_GUI_NORMAL);
 
 	changeImage();
+
+	blurCircle = cv::imread("..\\images\\blurCircle.png", CV_LOAD_IMAGE_ANYDEPTH);
+	
+	if( !blurCircle.data )
+	{
+		cout <<  "Could not open or find the image" << std::endl ;
+		return -1;
+	}
+	
+	cv::resize(blurCircle, blurCircle, cvSize(CIRCLE_SIZE, CIRCLE_SIZE), 0, 0, 1);
+
 
 	cv::imshow( "window", imageMask );
 	cv::moveWindow( "window", -25, -30 );
