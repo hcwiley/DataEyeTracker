@@ -6,6 +6,8 @@
 
 #include <Windows.h>
 #include <stdio.h>
+#include <tchar.h> 
+#include <strsafe.h>
 #include <conio.h>
 #include <assert.h>
 #include "eyex\EyeX.h"
@@ -31,7 +33,7 @@ cv::Mat image0;
 cv::Mat imageMask;
 cv::Mat imageProjector;
 cv::Mat blurCircle;
-const int numImages = 2;
+int numImages = 1;
 int curImage = 0;
 
 
@@ -49,19 +51,35 @@ int BOUNDING_BOX = 20;
 
 // blacks out the imageMask Mat
 void blackOutMask(){
-	imageMask.setTo(cv::Scalar(0,0,0,255));
+	imageMask.setTo(cv::Scalar(0,0,0));
 }
 
 void resetProjector(){
-	imageProjector.setTo(cv::Scalar(0,0,0,255));
+	imageProjector.setTo(cv::Scalar(0,0,0));
 }
 
 void changeImage(){
+	HANDLE hFind;
+	WIN32_FIND_DATA search_data;
+	memset(&search_data, 0, sizeof(WIN32_FIND_DATA));
+	TCHAR imgDir[200];
+	StringCchCopy(imgDir, MAX_PATH, TEXT("..\\images\\data*.jpg"));
+	HANDLE handle = FindFirstFile(imgDir, &search_data);
+
+	numImages = 0;
+	while(handle != INVALID_HANDLE_VALUE)
+	{
+		printf("Found file: %s\r\n", search_data.cFileName);
+		numImages++;
+		if(FindNextFile(handle, &search_data) == FALSE)
+		break;
+	}
+
 	char path[200];
 	curImage++;
 	if( curImage > numImages )
 		curImage = 1;
-	sprintf_s(path, 200 ,"..\\images\\data%d.png", curImage);
+	sprintf_s(path, 200 ,"..\\images\\data%d.jpg", curImage);
 	image0 = cv::imread(path, 1);
 	
 	if( !image0.data )
@@ -71,6 +89,8 @@ void changeImage(){
 	}
 	
 	cv::resize(image0, image0, cvSize(1920,1080), 0, 0, 1);
+
+	//image0.convertTo(image0, CV_8UC4, 1.0,0.0);
 
 	imageMask = image0.clone();
 	imageProjector = image0.clone();
@@ -156,14 +176,15 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	}
 }
 
-void overlayImage(const cv::Mat &background, const cv::Mat &foreground, 
-  cv::Mat &output, cv::Point2i location)
+cv::Mat overlayImage(cv::Mat background, cv::Mat foreground, cv::Point location)
 {
-  background.copyTo(output);
-
+  
+	 
+	cv::Mat output;// = background.clone();
+	cv::cvtColor(background,output,CV_BGR2BGRA, 4);
 
   // start at the row indicated by location, or at row 0 if location.y is negative.
-  for(int y = std::max(location.y , 0); y < background.rows; ++y)
+  for(int y = location.y; y < background.rows; y++)
   {
     int fY = y - location.y; // because of the translation
 
@@ -174,7 +195,7 @@ void overlayImage(const cv::Mat &background, const cv::Mat &foreground,
     // start at the column indicated by location, 
 
     // or at column 0 if location.x is negative.
-    for(int x = std::max(location.x, 0); x < background.cols; ++x)
+    for(int x = location.x; x < background.cols; x++)
     {
       int fX = x - location.x; // because of the translation.
 
@@ -183,26 +204,33 @@ void overlayImage(const cv::Mat &background, const cv::Mat &foreground,
         break;
 
       // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
-      double opacity =
-        ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])
-
-        / 255.;
+      //double opacity =
+      //  ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])/ 255.0;
 
 
       // and now combine the background and foreground pixel, using the opacity, 
 
+	  //output.data[y*output.step + output.channels()*x + 4] = opacity;
+	  //continue;
       // but only if opacity > 0.
-      for(int c = 0; opacity > 0 && c < output.channels(); ++c)
+	  //for(int c = 0; c < output.channels(); c++) {
+	  //output.at<cv::Vec4b>(cvPoint(x,y))[0] = 0;
+	  //output.at<cv::Vec4b>(cvPoint(x,y))[1] = 0;
+	  //output.at<cv::Vec4b>(cvPoint(x,y))[2] = 255;
+	  output.at<cv::Vec4b>(cvPoint(x,y))[3] = 0.5;
+	  //}
+      /*for(int c = 2; c < output.channels(); c++)
       {
         unsigned char foregroundPx =
           foreground.data[fY * foreground.step + fX * foreground.channels() + c];
         unsigned char backgroundPx =
           background.data[y * background.step + x * background.channels() + c];
         output.data[y*output.step + output.channels()*x + c] =
-          backgroundPx * (1.-opacity) + foregroundPx * opacity;
-      }
+          backgroundPx * (1-opacity) + foregroundPx * opacity;
+      }*/
     }
   }
+  return output;
 }
 
 int shouldUpdateWindow = 0;
@@ -250,15 +278,14 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			weightedAvgPoint.y += eventParams.Y * 0.2;
 
 			// draw circle for where eye is
+			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE-5, cvScalar(255,255,255), -1, -1, 0);
+			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
 
-			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
-			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
-
+			//cv::cvtColor(
 			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
 
-			overlayImage(img0, blurCircle, img0, cvPoint(weightedAvgPoint.x-CIRCLE_SIZE/2,weightedAvgPoint.y-CIRCLE_SIZE/2));
-			cv::imshow("window", img0);
+			cv::imshow("window", img0);//overlayImage(img0, blurCircle, cvPoint(weightedAvgPoint.x-CIRCLE_SIZE/2, weightedAvgPoint.y-CIRCLE_SIZE/2) ) );
 			cv::imshow("projector", imgP);
 		}
 
@@ -361,7 +388,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	cv::resize(blurCircle, blurCircle, cvSize(CIRCLE_SIZE, CIRCLE_SIZE), 0, 0, 1);
+	cv::resize(blurCircle, blurCircle, cvSize(CIRCLE_SIZE*2.25, CIRCLE_SIZE*2.25), 0, 0, 1);
 
 
 	cv::imshow( "window", imageMask );
