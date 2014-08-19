@@ -40,13 +40,16 @@ int curImage = 0;
 /**
 * ANNIELAURIE CHANGE THE CHANGE_IMAGE_TIMER TO BE NUMBER OF SECONDS TO CHANGE TO NEXT IMAGE
 */
-int CHANGE_IMAGE_TIMER = 3;
+int CHANGE_IMAGE_TIMER = 2;
 
 /**
 * ANNIELAURIE CHANGE THE CIRCLE_SIZE TO BE THE SIZE OF CIRCLE THAT IS VISIBLE
 */
 int CIRCLE_SIZE = 100;
 
+/**
+* ANNIELAURIE CHANGE THE BOUNDING_BOX TO BE THE WIGGLE ROOM BEFORE IMAGE CHANGE
+*/
 int BOUNDING_BOX = 20;
 
 // blacks out the imageMask Mat
@@ -69,7 +72,7 @@ void changeImage(){
 	numImages = 0;
 	while(handle != INVALID_HANDLE_VALUE)
 	{
-		printf("Found file: %s\r\n", search_data.cFileName);
+		//printf("Found file: %s\r\n", search_data.cFileName);
 		numImages++;
 		if(FindNextFile(handle, &search_data) == FALSE)
 		break;
@@ -79,7 +82,7 @@ void changeImage(){
 	curImage++;
 	if( curImage > numImages )
 		curImage = 1;
-	sprintf_s(path, 200 ,"..\\images\\data%d.jpg", curImage);
+	sprintf_s(path, 200 ,"..\\images\\data (%d).jpg", curImage);
 	image0 = cv::imread(path, 1);
 	
 	if( !image0.data )
@@ -176,63 +179,6 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	}
 }
 
-cv::Mat overlayImage(cv::Mat background, cv::Mat foreground, cv::Point location)
-{
-  
-	 
-	cv::Mat output;// = background.clone();
-	cv::cvtColor(background,output,CV_BGR2BGRA, 4);
-
-  // start at the row indicated by location, or at row 0 if location.y is negative.
-  for(int y = location.y; y < background.rows; y++)
-  {
-    int fY = y - location.y; // because of the translation
-
-    // we are done of we have processed all rows of the foreground image.
-    if(fY >= foreground.rows)
-      break;
-
-    // start at the column indicated by location, 
-
-    // or at column 0 if location.x is negative.
-    for(int x = location.x; x < background.cols; x++)
-    {
-      int fX = x - location.x; // because of the translation.
-
-      // we are done with this row if the column is outside of the foreground image.
-      if(fX >= foreground.cols)
-        break;
-
-      // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
-      //double opacity =
-      //  ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])/ 255.0;
-
-
-      // and now combine the background and foreground pixel, using the opacity, 
-
-	  //output.data[y*output.step + output.channels()*x + 4] = opacity;
-	  //continue;
-      // but only if opacity > 0.
-	  //for(int c = 0; c < output.channels(); c++) {
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[0] = 0;
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[1] = 0;
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[2] = 255;
-	  output.at<cv::Vec4b>(cvPoint(x,y))[3] = 0.5;
-	  //}
-      /*for(int c = 2; c < output.channels(); c++)
-      {
-        unsigned char foregroundPx =
-          foreground.data[fY * foreground.step + fX * foreground.channels() + c];
-        unsigned char backgroundPx =
-          background.data[y * background.step + x * background.channels() + c];
-        output.data[y*output.step + output.channels()*x + c] =
-          backgroundPx * (1-opacity) + foregroundPx * opacity;
-      }*/
-    }
-  }
-  return output;
-}
-
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
@@ -260,7 +206,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
-		if(shouldUpdateWindow++ > 1) {
+		if(shouldUpdateWindow++ > 2) {
 
 			//clear the things
 			shouldUpdateWindow = 0;
@@ -281,11 +227,10 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE-5, cvScalar(255,255,255), -1, -1, 0);
 			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
 
-			//cv::cvtColor(
 			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
 
-			cv::imshow("window", img0);//overlayImage(img0, blurCircle, cvPoint(weightedAvgPoint.x-CIRCLE_SIZE/2, weightedAvgPoint.y-CIRCLE_SIZE/2) ) );
+			cv::imshow("window", img0);
 			cv::imshow("projector", imgP);
 		}
 
@@ -357,7 +302,7 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 					return;
 
 				cv::Mat img0;
-				cv::blur(image0,img0,cvSize(101,101),cvPoint(-1,-1),4);
+				cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
 				cv::imshow("window", img0);
 			} else {
 				blackOutMask();
@@ -392,10 +337,10 @@ int main(int argc, char* argv[])
 
 
 	cv::imshow( "window", imageMask );
-	cv::moveWindow( "window", -25, -30 );
+	cv::moveWindow( "window", -10, 0 );
 
 	cv::imshow( "projector", imageMask );
-	cv::moveWindow( "projector", 200, 400 );
+	cv::moveWindow( "projector", -1930, 0 );
 
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
