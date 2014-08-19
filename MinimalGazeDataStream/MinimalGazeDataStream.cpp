@@ -273,7 +273,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			weightedAvgPoint.y += eventParams.Y * 0.2;
 
 			// draw circle for where eye is
-			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE-5, cvScalar(255,255,255), -1, -1, 0);
+			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
 			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
 
 			image0.copyTo(img0, imageMask);
@@ -358,7 +358,6 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 			} else {
 				blackOutMask();
 				resetProjector();
-
 			}
 		}
 	}
