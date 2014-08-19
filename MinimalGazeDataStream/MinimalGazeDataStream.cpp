@@ -176,15 +176,15 @@ void TX_CALLCONVENTION OnEngineConnectionStateChanged(TX_CONNECTIONSTATE connect
 	}
 }
 
-cv::Mat overlayImage(cv::Mat background, cv::Mat foreground, cv::Point location)
+
+void overlayImage(const cv::Mat &background, const cv::Mat &foreground,
+    cv::Mat &output, cv::Point2i location)
 {
-  
-	 
-	cv::Mat output;// = background.clone();
-	cv::cvtColor(background,output,CV_BGR2BGRA, 4);
+  background.copyTo(output);
+
 
   // start at the row indicated by location, or at row 0 if location.y is negative.
-  for(int y = location.y; y < background.rows; y++)
+  for(int y = std::max(location.y , 0); y < background.rows; ++y)
   {
     int fY = y - location.y; // because of the translation
 
@@ -192,10 +192,10 @@ cv::Mat overlayImage(cv::Mat background, cv::Mat foreground, cv::Point location)
     if(fY >= foreground.rows)
       break;
 
-    // start at the column indicated by location, 
+    // start at the column indicated by location,
 
     // or at column 0 if location.x is negative.
-    for(int x = location.x; x < background.cols; x++)
+    for(int x = std::max(location.x, 0); x < background.cols; ++x)
     {
       int fX = x - location.x; // because of the translation.
 
@@ -204,33 +204,26 @@ cv::Mat overlayImage(cv::Mat background, cv::Mat foreground, cv::Point location)
         break;
 
       // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
-      //double opacity =
-      //  ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])/ 255.0;
+      double opacity =
+        ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])
+
+        / 255.;
 
 
-      // and now combine the background and foreground pixel, using the opacity, 
+      // and now combine the background and foreground pixel, using the opacity,
 
-	  //output.data[y*output.step + output.channels()*x + 4] = opacity;
-	  //continue;
       // but only if opacity > 0.
-	  //for(int c = 0; c < output.channels(); c++) {
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[0] = 0;
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[1] = 0;
-	  //output.at<cv::Vec4b>(cvPoint(x,y))[2] = 255;
-	  output.at<cv::Vec4b>(cvPoint(x,y))[3] = 0.5;
-	  //}
-      /*for(int c = 2; c < output.channels(); c++)
+      for(int c = 0; opacity > 0 && c < output.channels(); ++c)
       {
         unsigned char foregroundPx =
           foreground.data[fY * foreground.step + fX * foreground.channels() + c];
         unsigned char backgroundPx =
           background.data[y * background.step + x * background.channels() + c];
         output.data[y*output.step + output.channels()*x + c] =
-          backgroundPx * (1-opacity) + foregroundPx * opacity;
-      }*/
+          backgroundPx * (1.-opacity) + foregroundPx * opacity;
+      }
     }
   }
-  return output;
 }
 
 int shouldUpdateWindow = 0;
@@ -285,7 +278,9 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			image0.copyTo(img0, imageMask);
 			image0.copyTo(imgP, imageProjector);
 
-			cv::imshow("window", img0);//overlayImage(img0, blurCircle, cvPoint(weightedAvgPoint.x-CIRCLE_SIZE/2, weightedAvgPoint.y-CIRCLE_SIZE/2) ) );
+      overlayImage(img0, blurCircle, img0, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
+
+			cv::imshow("window", img0);
 			cv::imshow("projector", imgP);
 		}
 
@@ -380,7 +375,7 @@ int main(int argc, char* argv[])
 
 	changeImage();
 
-	blurCircle = cv::imread("..\\images\\blurCircle.png", CV_LOAD_IMAGE_ANYDEPTH);
+	blurCircle = cv::imread("..\\images\\blurCircle.png", -1);
 	
 	if( !blurCircle.data )
 	{
