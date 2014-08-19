@@ -11,6 +11,8 @@
 #include <conio.h>
 #include <assert.h>
 #include "eyex\EyeX.h"
+#include <chrono>
+#include <thread>
 
 #include "opencv2\core\core.hpp"
 #include "opencv2\highgui\highgui.hpp"
@@ -342,6 +344,23 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 }
 
 
+bool doSreenSaver = false;
+void screenSave() {
+  int i = 0;
+  while(doScreenSaver) {
+    drawCircle((cv::Point)*lastTrail[i]);
+	  cv::Mat img0;
+    cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
+    cv::imshow("window", img0);
+    if( i < lastTrail.size() )
+      i++;
+    else
+      i = 0;
+    //std::this_thread::sleep_for(std::chrono::milliseconds(fps));
+  }
+  return;
+}
+
 /*
  * Handles state changed notifications.
  */
@@ -361,13 +380,10 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 
       // if user is NOT present
 			if( presenceData == TX_PRESENCEDATA_NOTPRESENT ) {
-				if(!image0.data)
-					return;
-
-				cv::Mat img0;
-				cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
-				cv::imshow("window", img0);
+        doScreenSaver = true;
+        screenSave()
 			} else {
+        doScreenSaver = false;
         // they ARE present
 				blackOutMask();
 				resetProjector();
