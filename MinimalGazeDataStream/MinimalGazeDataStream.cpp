@@ -36,6 +36,8 @@ cv::Mat blurCircle;
 int numImages = 1;
 int curImage = 0;
 
+std::vector<cv::Point> lastTrail;
+
 
 /**
 * ANNIELAURIE CHANGE THE CHANGE_IMAGE_TIMER TO BE NUMBER OF SECONDS TO CHANGE TO NEXT IMAGE
@@ -228,6 +230,30 @@ void overlayImage(const cv::Mat &background, const cv::Mat &foreground,
   }
 }
 
+void drawCircle(cv::Point weightedAvgPoint){
+  blackOutMask();
+
+  // display image
+  cv::Mat img0;
+  cv::Mat imgP;
+
+
+  // draw circle for where eye is
+
+  cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
+  cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
+
+  image0.copyTo(img0, imageMask);
+  image0.copyTo(imgP, imageProjector);
+
+  overlayImage(img0, blurCircle, img0, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
+
+  cv::imshow("window", img0);
+  cv::imshow("projector", imgP);
+
+}
+
+
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
@@ -261,28 +287,13 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			shouldUpdateWindow = 0;
 			blackOutMask();
 
-			// display image
-			cv::Mat img0;
-			cv::Mat imgP;
-			
-
 			// calculate weighted average for making the dot move smoother
 			weightedAvgPoint.x *= 0.8;
 			weightedAvgPoint.y *= 0.8;
 			weightedAvgPoint.x += eventParams.X * 0.2;
 			weightedAvgPoint.y += eventParams.Y * 0.2;
 
-			// draw circle for where eye is
-			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE-5, cvScalar(255,255,255), -1, -1, 0);
-			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
-
-			image0.copyTo(img0, imageMask);
-			image0.copyTo(imgP, imageProjector);
-			
-			overlayImage(img0, blurCircle, img0, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
-			
-			cv::imshow("window", img0);
-			cv::imshow("projector", imgP);
+      drawCircle(weightedAvgPoint);
 		}
 
 		// checking for whether we should change the image
@@ -348,6 +359,7 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 		{
 			printf("User is %s\n", presenceData == TX_PRESENCEDATA_PRESENT ? "present" : "NOT present");
 
+      // if user is NOT present
 			if( presenceData == TX_PRESENCEDATA_NOTPRESENT ) {
 				if(!image0.data)
 					return;
@@ -356,9 +368,10 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 				cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
 				cv::imshow("window", img0);
 			} else {
+        // they ARE present
 				blackOutMask();
 				resetProjector();
-
+        lastTrail.clear();
 			}
 		}
 	}
@@ -426,6 +439,7 @@ int main(int argc, char* argv[])
 	txReleaseContext(&hContext);
 
 	cv::destroyWindow("window");
+	cv::destroyWindow("projector");
 
 	return 0;
 }
