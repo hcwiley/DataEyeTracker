@@ -43,6 +43,16 @@ std::vector<cv::Point> lastTrail;
 
 
 /**
+* ANNIELAURIE CHANGE THE BLUR_AMOUNT TO BE AMOUNT OF BLUR ON SCREEN SAVER IMAGE. MAKE SURE ITS AN ODD NUMBER!!!
+*/
+int BLUR_AMOUNT = 51;
+
+/**
+* ANNIELAURIE CHANGE THE CHANGE_IMAGE_TIMER TO BE NUMBER OF SECONDS TO CHANGE TO NEXT IMAGE
+*/
+int SCREEN_SAVER_RESET_TIMER = 3;
+
+/**
 * ANNIELAURIE CHANGE THE CHANGE_IMAGE_TIMER TO BE NUMBER OF SECONDS TO CHANGE TO NEXT IMAGE
 */
 int CHANGE_IMAGE_TIMER = 2;
@@ -259,7 +269,7 @@ void drawCircle(cv::Point weightedAvgPoint, bool projectorOnly=false){
   if( !projectorOnly)
 	cv::imshow("window", img0);
   else{
-	cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
+	cv::blur(image0,img0,cvSize(BLUR_AMOUNT,BLUR_AMOUNT),cvPoint(-1,-1),4);
 	cv::imshow("window", img0);
   }
   cv::imshow("projector", imgP);
@@ -268,6 +278,7 @@ void drawCircle(cv::Point weightedAvgPoint, bool projectorOnly=false){
 
 
 int shouldUpdateWindow = 0;
+time_t window_timer = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
 int shouldMove = 0;
@@ -275,7 +286,7 @@ time_t lastMove = 0;
 
 int fps = 24;
 int frames = 0;
-time_t timer = 0;
+time_t fps_timer = 0;
 /*
  * Handles an event from the Gaze Point data stream.
  */
@@ -286,15 +297,18 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		time_t now;
 		time(&now);
 		frames++;
-		if( difftime(now,timer) >= 1 ){
-			time(&timer);
+		if( difftime(now,fps_timer) >= 1 ){
+			time(&fps_timer);
 			fps = frames;
 			frames = 0;
-			doScreenSaver = false;
 		}
 		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
+		if( difftime(now,window_timer) >= 2 ){
+			time(&window_timer);
+			doScreenSaver = false;
+		}
 		if(shouldUpdateWindow++ > 2) {
 			//clear the things
 			shouldUpdateWindow = 0;
@@ -365,7 +379,7 @@ void screenSave() {
       curPoint++;
     else{
       curPoint = 0;
-	  std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+	  std::this_thread::sleep_for(std::chrono::milliseconds(SCREEN_SAVER_RESET_TIMER * 1000));
 	  resetProjector();
 	}
 	
