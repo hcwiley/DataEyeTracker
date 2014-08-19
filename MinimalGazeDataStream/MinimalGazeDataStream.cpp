@@ -255,7 +255,7 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
-		if(shouldUpdateWindow++ > 2) {
+		if(shouldUpdateWindow++ > 1) {
 
 			//clear the things
 			shouldUpdateWindow = 0;
@@ -384,14 +384,14 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 	
-	cv::resize(blurCircle, blurCircle, cvSize(CIRCLE_SIZE*2.25, CIRCLE_SIZE*2.25), 0, 0, 1);
+	cv::resize(blurCircle, blurCircle, cvSize(CIRCLE_SIZE*2, CIRCLE_SIZE*2), 0, 0, 1);
 
 
 	cv::imshow( "window", imageMask );
 	cv::moveWindow( "window", -10, 0 );
 
 	cv::imshow( "projector", imageMask );
-	cv::moveWindow( "projector", -1930, 0 );
+	cv::moveWindow( "projector", 1930, 0 );
 
 	TX_CONTEXTHANDLE hContext = TX_EMPTY_HANDLE;
 	TX_TICKET hConnectionStateChangedTicket = TX_INVALID_TICKET;
