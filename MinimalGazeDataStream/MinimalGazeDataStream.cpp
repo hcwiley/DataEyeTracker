@@ -11,6 +11,8 @@
 #include <conio.h>
 #include <assert.h>
 #include "eyex\EyeX.h"
+#include <chrono>
+#include <thread>
 
 #include "opencv2\core\core.hpp"
 #include "opencv2\highgui\highgui.hpp"
@@ -35,6 +37,9 @@ cv::Mat imageProjector;
 cv::Mat blurCircle;
 int numImages = 1;
 int curImage = 0;
+bool doScreenSaver = false;
+
+std::vector<cv::Point> lastTrail;
 
 
 /**
@@ -95,6 +100,7 @@ void changeImage(){
 
 	//image0.convertTo(image0, CV_8UC4, 1.0,0.0);
 
+	lastTrail.clear();
 	imageMask = image0.clone();
 	imageProjector = image0.clone();
 
@@ -228,6 +234,39 @@ void overlayImage(const cv::Mat &background, const cv::Mat &foreground,
   }
 }
 
+void drawCircle(cv::Point weightedAvgPoint, bool projectorOnly=false){
+  blackOutMask();
+
+  // display image
+  cv::Mat img0;
+  cv::Mat imgP;
+
+
+  // draw circle for where eye is
+
+  if( !projectorOnly)
+	cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255, 255), -1, 8, 0);
+  cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, 8, 0);
+
+  if( !projectorOnly)
+	image0.copyTo(img0, imageMask);
+  image0.copyTo(imgP, imageProjector);
+
+  if( !projectorOnly)
+	overlayImage(img0, blurCircle, img0, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
+  //overlayImage(imgP, blurCircle, imageProjector, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
+
+  if( !projectorOnly)
+	cv::imshow("window", img0);
+  else{
+	cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
+	cv::imshow("window", img0);
+  }
+  cv::imshow("projector", imgP);
+
+}
+
+
 int shouldUpdateWindow = 0;
 cv::Point lastPoint;
 cv::Point weightedAvgPoint;
@@ -251,20 +290,15 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			time(&timer);
 			fps = frames;
 			frames = 0;
+			doScreenSaver = false;
 		}
 		//printf("Gaze Data: (%.1f, %.1f) timestamp %.0f ms\n", eventParams.X, eventParams.Y, eventParams.Timestamp);
 		if(!image0.data)
 			return;
-		if(shouldUpdateWindow++ > 1) {
-
+		if(shouldUpdateWindow++ > 2) {
 			//clear the things
 			shouldUpdateWindow = 0;
 			blackOutMask();
-
-			// display image
-			cv::Mat img0;
-			cv::Mat imgP;
-			
 
 			// calculate weighted average for making the dot move smoother
 			weightedAvgPoint.x *= 0.8;
@@ -272,17 +306,8 @@ void OnGazeDataEvent(TX_HANDLE hGazeDataBehavior)
 			weightedAvgPoint.x += eventParams.X * 0.2;
 			weightedAvgPoint.y += eventParams.Y * 0.2;
 
-			// draw circle for where eye is
-			cv::circle(imageMask, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
-			cv::circle(imageProjector, weightedAvgPoint, CIRCLE_SIZE, cvScalar(255,255,255), -1, -1, 0);
-
-			image0.copyTo(img0, imageMask);
-			image0.copyTo(imgP, imageProjector);
-			
-			overlayImage(img0, blurCircle, img0, cv::Point(weightedAvgPoint.x-CIRCLE_SIZE, weightedAvgPoint.y-CIRCLE_SIZE));
-			
-			cv::imshow("window", img0);
-			cv::imshow("projector", imgP);
+			drawCircle(weightedAvgPoint);
+			lastTrail.push_back(weightedAvgPoint);
 		}
 
 		// checking for whether we should change the image
@@ -330,6 +355,31 @@ void TX_CALLCONVENTION HandleEvent(TX_CONSTHANDLE hAsyncData, TX_USERPARAM userP
 	txReleaseObject(&hEvent);
 }
 
+int curPoint = 0;
+void screenSave() {
+  if(doScreenSaver) {
+	if( curPoint < lastTrail.size() -1 && lastTrail.size() > 0){
+		drawCircle((cv::Point)lastTrail[curPoint], true);
+	}
+    if( curPoint < lastTrail.size() -1 )
+      curPoint++;
+    else{
+      curPoint = 0;
+	  std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+	  resetProjector();
+	}
+	
+    std::this_thread::sleep_for(std::chrono::milliseconds(fps));
+	screenSave();
+  } 
+  else {
+	blackOutMask();
+	resetProjector();
+	if(lastTrail.size() > 10)
+		lastTrail.clear();
+	return;
+  }
+}
 
 /*
  * Handles state changed notifications.
@@ -348,16 +398,14 @@ void TX_CALLCONVENTION OnPresenceStateChanged(TX_CONSTHANDLE hAsyncData, TX_USER
 		{
 			printf("User is %s\n", presenceData == TX_PRESENCEDATA_PRESENT ? "present" : "NOT present");
 
+			// if user is NOT present
 			if( presenceData == TX_PRESENCEDATA_NOTPRESENT ) {
-				if(!image0.data)
-					return;
-
-				cv::Mat img0;
-				cv::blur(image0,img0,cvSize(51,51),cvPoint(-1,-1),4);
-				cv::imshow("window", img0);
-			} else {
-				blackOutMask();
 				resetProjector();
+				doScreenSaver = true;
+				screenSave();
+			} else {
+				// they ARE present
+				doScreenSaver = false;
 			}
 		}
 	}
@@ -425,6 +473,7 @@ int main(int argc, char* argv[])
 	txReleaseContext(&hContext);
 
 	cv::destroyWindow("window");
+	cv::destroyWindow("projector");
 
 	return 0;
 }
